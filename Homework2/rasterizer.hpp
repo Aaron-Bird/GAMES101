@@ -101,7 +101,7 @@ namespace rst
 		int get_next_id() { return next_id++; }
 
 		bool ssaa = 0;
-		int ssaaSamples = 3;
+		int ssaaSamples = 2;
 		std::vector<float> ssaa_depth_buf;
 		std::vector<Eigen::Vector3f> ssaa_frame_buf;
 	};

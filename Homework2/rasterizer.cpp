@@ -198,12 +198,12 @@ void rst::rasterizer::rasterize_triangle(const Triangle& t)
 				{
 					for (int subpixelIdxY = 0; subpixelIdxY < ssaaSamples; subpixelIdxY++)
 					{
-						int index = (y * ssaaSamples + subpixelIdxY) * (width * ssaaSamples) + (x * ssaaSamples + subpixelIdxX);
-						color += ssaa_frame_buf[index];
+						int subpixelIdx = (y * ssaaSamples + subpixelIdxY) * (width * ssaaSamples) + (x * ssaaSamples + subpixelIdxX);
+						color += ssaa_frame_buf[subpixelIdx];
 					}
 				}
 				color /= (ssaaSamples * ssaaSamples);
-				set_pixel({ x, y, 1 }, color);
+				set_pixel({ x, y, z }, color);
 			}
 		}
 	}
