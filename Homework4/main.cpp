@@ -72,6 +72,10 @@ void bezier(const std::vector<cv::Point2f>& control_points, cv::Mat& window)
 		// Anti-aliasing for the point
 		int start_x = static_cast<int>(std::floor(point.x));
 		int start_y = static_cast<int>(std::floor(point.y));
+		int end_x = static_cast<int>(std::ceil(point.x));
+		int end_y = static_cast<int>(std::ceil(point.y));
+		if (point.x - start_x < 0.5) start_x -= 1;
+		if (point.y - start_y < 0.5) start_y -= 1;
 
 		for (int i = 0; i < 2; i++)
 		{
@@ -86,12 +90,11 @@ void bezier(const std::vector<cv::Point2f>& control_points, cv::Mat& window)
 				float distance = std::sqrt(dx * dx + dy * dy);
 				float weight = std::max(0.0f, 1.0f - distance);
 
-				float old_value = window.at<cv::Vec3b>(subpixel_y, subpixel_x)[2];
+				float old_value = window.at<cv::Vec3b>(subpixel_y, subpixel_x)[1];
 				// Lerp between original color and target 
 				float mixed = std::min(255.0f, (1.0f - weight) * old_value + 255 * weight);
 
-				window.at<cv::Vec3b>(subpixel_y, subpixel_x)[2] = mixed;
-
+				window.at<cv::Vec3b>(subpixel_y, subpixel_x)[1] = mixed;
 			}
 		}
 	}
@@ -110,9 +113,9 @@ int main()
 	// test for bezier function
 	control_points.push_back({ 100, 300 });
 	control_points.push_back({ 200, 200 });
-	control_points.push_back({ 300, 300 });
-	control_points.push_back({ 400, 200 });
-	control_points.push_back({ 500, 300 });
+	control_points.push_back({ 300, 200 });
+	control_points.push_back({ 400, 300 });
+	//control_points.push_back({ 500, 300 });
 
 	while (key != 27)
 	{
@@ -121,10 +124,10 @@ int main()
 			cv::circle(window, point, 3, { 255, 255, 255 }, 3);
 		}
 
-		if (control_points.size() >= 3)
-			//if (control_points.size() == 4) 
+
+		if (control_points.size() == 4)
 		{
-			//naive_bezier(control_points, window);
+			naive_bezier(control_points, window);
 			bezier(control_points, window);
 
 			cv::imshow("Bezier Curve", window);
