@@ -54,71 +54,97 @@ BVHBuildNode* BVHAccel::recursiveBuild(std::vector<Object*> objects)
         return node;
     }
     else {
+        // centroidBounds 为所有 object 的中心点的包围盒
         Bounds3 centroidBounds;
+        // leftshapes 和 rightshapes 分别为划分后左右子节点的 object 列表
         std::vector<Object*> leftshapes;
         std::vector<Object*> rightshapes;
-
+        // 仅当 object 数量 > 4 时使用 SAH 划分算法
+        // object 数量 <= 4 时使用中位数划分算法
         if(splitMethod == SplitMethod::SAH && objects.size() > 4)
         {
+
             for (int i = 0; i < objects.size(); i++)
                 centroidBounds = Union(centroidBounds, objects[i]->getBounds().Centroid());
-
+            // bestAxis, bestSplit 分别为最佳划分轴和划分位置
             int bestAxis = 0;
             int bestSplit = 0;
+            // minCost 为当前最小划分代价
             float minCost = std::numeric_limits<float>::infinity();
+            // 因为对 objects 排序耗时较多,使用桶排序来减少排序时间
+            // 根据 object 的中心点位置将其划分到不同的桶中
+            // numBuckets 为划分桶的数量
             const int numBuckets = 12;
 
+            // objectBucketIndices 为每个 object 所在的桶的索引
+            // 放在 for 循环外面是为了供后续的 leftshapes.push_back 和 rightshapes.push_back 使用
             std::vector<std::array<int, 3>> objectBucketIndices(objects.size());
             for (int i = 0; i < objects.size(); i++) 
             {
                 std::array<int, 3> bucketIndex;
+                // 根据 object 的中心点到 centroidBounds 的偏移量来计算其所在的桶的索引
                 Vector3f offset = centroidBounds.Offset(objects[i]->getBounds().Centroid());
+                // 使用 clamp 是为了确保 bucketIndex 在 [0, numBuckets - 1] 范围内
                 bucketIndex[0] = std::clamp(int(numBuckets * offset.x), 0, numBuckets - 1);
                 bucketIndex[1] = std::clamp(int(numBuckets * offset.y), 0, numBuckets - 1);
                 bucketIndex[2] = std::clamp(int(numBuckets * offset.z), 0, numBuckets - 1);
                 objectBucketIndices[i] = bucketIndex;
             }
 
+            // 遍历三个轴,分别计算在该轴上划分的代价
             for( int axis = 0; axis < 3; axis++) 
             {
+                // bucketCounts 为每个桶中包含的 object 数量
                 int bucketCounts[numBuckets] {0};
+                // bucketBounds 为每个桶对应的包围盒
                 Bounds3 bucketBounds[numBuckets];
                
                 for (int i = 0; i < objects.size(); i++) 
                 {
                     // int bucketIndex = numBuckets * centroidBounds.Offset(objects[i]->getBounds().Centroid())[axis];
                     // bucketIndex = std::clamp(bucketIndex, 0, numBuckets - 1);
+                    // 取出该 object 在该轴上的桶索引
                     int bucketIndex = objectBucketIndices[i][axis];
+
+                    // 更新对应桶的 object 数量和包围盒
                     bucketCounts[bucketIndex]++;
                     bucketBounds[bucketIndex] = Union(bucketBounds[bucketIndex], objects[i]->getBounds());
                 }
 
+                // prefixBounds 和 suffixBounds 为当前桶索引 i 的左侧和右侧所有桶的包围盒
                 Bounds3 prefixBounds[numBuckets], suffixBounds[numBuckets];
+                // prefixCounts 和 suffixCounts 为当前桶索引 i 的左侧和右侧所有桶的 object 数量
                 int prefixCounts[numBuckets] {0}, suffixCounts[numBuckets] {0};
                 prefixBounds[0] = bucketBounds[0];
                 prefixCounts[0] = bucketCounts[0];
                 suffixBounds[numBuckets - 1] = bucketBounds[numBuckets - 1];
                 suffixCounts[numBuckets - 1] = bucketCounts[numBuckets - 1];
-
+                
                 for (int i = 1; i < numBuckets; ++i)
                 {
+                    // prefixBounds 包含自身和左侧所有桶的包围盒
+                    // prefixCounts 包含自身和左侧所有桶的 object 数量
                     prefixBounds[i] = Union(prefixBounds[i-1], bucketBounds[i]);
                     prefixCounts[i] = prefixCounts[i-1] + bucketCounts[i];
                 }
                 
                 for (int i = numBuckets - 2; i >= 0; i--)
                 {
+                    // suffixBounds 包含自身和右侧所有桶的包围盒
+                    // suffixCounts 包含自身和右侧所有桶的 object 数量
                     suffixBounds[i] = Union(suffixBounds[i+1], bucketBounds[i]);
                     suffixCounts[i] = suffixCounts[i+1] + bucketCounts[i];
                 }
 
+                // 从左向右遍历桶,将桶作为划分点,计算划分代价
                 for(int i = 0; i < numBuckets - 1; i++) 
                 {
                     Bounds3 leftBound = prefixBounds[i];
                     Bounds3 rightBound = suffixBounds[i+1];
                     int leftCount = prefixCounts[i];
                     int rightCount = suffixCounts[i+1];
-
+                    // 计算当前划分的代价
+                    // 此处假设 t_traversal = 1, t_intersect = 1
                     float cost = 1 + (leftCount * leftBound.SurfaceArea() + rightCount * rightBound.SurfaceArea()) / bounds.SurfaceArea();
 
                     if(cost < minCost) 
@@ -130,6 +156,7 @@ BVHBuildNode* BVHAccel::recursiveBuild(std::vector<Object*> objects)
                 }
             }
 
+            // 根据最佳划分轴和最佳划分位置,将 objects 放入对应的 leftshapes 和 rightshapes
             for (int i = 0; i < objects.size(); i++) 
             {
                 int bucketIndex = objectBucketIndices[i][bestAxis];
