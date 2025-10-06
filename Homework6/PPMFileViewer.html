@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPM File Viewer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        neutral: '#1F2937',
+                    },
+                    fontFamily: {
+                        inter: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .file-drop-active {
+                @apply border-primary bg-blue-50;
+            }
+            .shadow-custom {
+                @apply shadow-lg hover:shadow-xl transition-shadow duration-300;
+            }
+        }
+    </style>
+</head>
+<body class="font-inter bg-gray-50 min-h-screen flex flex-col">
+    <!-- Header -->
+    <header class="bg-white shadow-md">
+        <div class="container mx-auto px-4 py-6">
+            <div class="flex flex-col md:flex-row justify-between items-center">
+                <div class="flex items-center mb-4 md:mb-0">
+                    <i class="fa fa-file-image-o text-primary text-3xl mr-3"></i>
+                    <h1 class="text-[clamp(1.5rem,3vw,2.5rem)] font-bold text-neutral">PPM File Viewer</h1>
+                </div>
+                <p class="text-gray-600 text-center md:text-right max-w-md">
+                    轻松上传并查看PPM格式图像文件
+                </p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow container mx-auto px-4 py-8">
+        <!-- File Upload Section -->
+        <section class="mb-12">
+            <div id="file-drop-area" class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center transition-all duration-300 shadow-custom">
+                <i class="fa fa-cloud-upload text-5xl text-gray-400 mb-4"></i>
+                <h2 class="text-xl font-semibold text-neutral mb-2">拖放PPM文件到这里</h2>
+                <p class="text-gray-500 mb-6">或者点击下方按钮选择文件</p>
+                
+                <label class="inline-block bg-primary hover:bg-primary/90 text-white font-medium py-3 px-6 rounded-lg cursor-pointer transition-all duration-300 transform hover:scale-105">
+                    <i class="fa fa-folder-open mr-2"></i>选择PPM文件
+                    <input type="file" id="file-input" accept=".ppm" class="hidden">
+                </label>
+                
+                <p class="mt-4 text-sm text-gray-500">
+                    支持PPM格式 (P3和P6)
+                </p>
+            </div>
+        </section>
+
+        <!-- Loading Indicator -->
+        <div id="loading-indicator" class="hidden text-center mb-8">
+            <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+            <p class="mt-4 text-gray-600">正在处理您的文件...</p>
+        </div>
+
+        <!-- Error Message -->
+        <div id="error-message" class="hidden bg-red-50 border border-red-200 rounded-lg p-6 mb-8">
+            <div class="flex items-start">
+                <i class="fa fa-exclamation-circle text-red-500 text-xl mt-1 mr-4"></i>
+                <div>
+                    <h3 class="font-semibold text-red-800 mb-2">处理文件时出错</h3>
+                    <p id="error-details" class="text-red-700"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Image Display Section -->
+        <section id="image-section" class="hidden">
+            <div class="bg-white rounded-xl shadow-custom p-6 mb-8">
+                <h2 class="text-xl font-semibold text-neutral mb-4 flex items-center">
+                    <i class="fa fa-eye mr-2 text-primary"></i>
+                    图像预览
+                </h2>
+                <div class="flex justify-center items-center overflow-auto p-4 border border-gray-200 rounded-lg min-h-[200px]">
+                    <canvas id="image-canvas" class="max-w-full max-h-[70vh] shadow-md"></canvas>
+                </div>
+            </div>
+
+            <!-- Image Info Section -->
+            <div class="bg-white rounded-xl shadow-custom p-6 mb-8">
+                <h2 class="text-xl font-semibold text-neutral mb-4 flex items-center">
+                    <i class="fa fa-info-circle mr-2 text-primary"></i>
+                    图像信息
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="text-sm font-medium text-gray-500 mb-1">格式</h3>
+                        <p id="image-format" class="text-lg font-semibold text-neutral">-</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="text-sm font-medium text-gray-500 mb-1">尺寸</h3>
+                        <p id="image-dimensions" class="text-lg font-semibold text-neutral">-</p>
+                    </div>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <h3 class="text-sm font-medium text-gray-500 mb-1">颜色深度</h3>
+                        <p id="image-depth" class="text-lg font-semibold text-neutral">-</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Instructions Section -->
+        <section class="bg-white rounded-xl shadow-custom p-6">
+            <h2 class="text-xl font-semibold text-neutral mb-4 flex items-center">
+                <i class="fa fa-book mr-2 text-primary"></i>
+                如何使用
+            </h2>
+            <div class="space-y-4 text-gray-700">
+                <p>PPM文件查看器是一个简单的工具，用于在浏览器中查看PPM格式的图像文件。</p>
+                <ol class="list-decimal pl-5 space-y-2">
+                    <li>点击"选择PPM文件"按钮，或者直接将PPM文件拖放到上传区域</li>
+                    <li>系统会自动处理并显示您的图像</li>
+                    <li>查看图像预览和相关信息</li>
+                </ol>
+                <p class="mt-4">支持的PPM格式：P3 (ASCII格式) 和 P6 (二进制格式)。</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-neutral text-white py-6">
+        <div class="container mx-auto px-4 text-center">
+            <p>© 2023 PPM File Viewer | 一个简单的在线PPM图像查看工具</p>
+            <p class="text-gray-400 text-sm mt-2">所有文件处理均在您的浏览器中进行，不会上传到服务器</p>
+        </div>
+    </footer>
+
+    <script>
+        // DOM Elements
+        const fileDropArea = document.getElementById('file-drop-area');
+        const fileInput = document.getElementById('file-input');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const errorMessage = document.getElementById('error-message');
+        const errorDetails = document.getElementById('error-details');
+        const imageSection = document.getElementById('image-section');
+        const imageCanvas = document.getElementById('image-canvas');
+        const ctx = imageCanvas.getContext('2d');
+        const imageFormat = document.getElementById('image-format');
+        const imageDimensions = document.getElementById('image-dimensions');
+        const imageDepth = document.getElementById('image-depth');
+
+        // Event Listeners for File Drop
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            fileDropArea.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            fileDropArea.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            fileDropArea.addEventListener(eventName, unhighlight, false);
+        });
+
+        function highlight() {
+            fileDropArea.classList.add('file-drop-active');
+        }
+
+        function unhighlight() {
+            fileDropArea.classList.remove('file-drop-active');
+        }
+
+        fileDropArea.addEventListener('drop', handleDrop, false);
+
+        function handleDrop(e) {
+            const dt = e.dataTransfer;
+            const file = dt.files[0];
+            if (file) {
+                handleFiles(file);
+            }
+        }
+
+        // Event Listener for File Input
+        fileInput.addEventListener('change', function() {
+            if (this.files.length > 0) {
+                handleFiles(this.files[0]);
+            }
+        });
+
+        // Handle File Upload
+        function handleFiles(file) {
+            // Check if file is a PPM
+            if (!file.name.toLowerCase().endsWith('.ppm')) {
+                showError('请上传PPM格式的文件 (.ppm)');
+                return;
+            }
+
+            // Show loading indicator
+            showLoading();
+            
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const arrayBuffer = e.target.result;
+                    parsePPM(arrayBuffer);
+                } catch (error) {
+                    showError(`解析文件时出错: ${error.message}`);
+                }
+            };
+            
+            reader.onerror = function() {
+                showError(`读取文件时出错: ${reader.error.message}`);
+            };
+            
+            // Read as ArrayBuffer to handle both text and binary formats
+            reader.readAsArrayBuffer(file);
+        }
+
+        // Parse PPM File
+        function parsePPM(arrayBuffer) {
+            const view = new DataView(arrayBuffer);
+            let offset = 0;
+            
+            // Read PPM signature
+            const signature = readSignature(view, offset);
+            offset += signature.length + 1; // +1 for newline
+            
+            if (!signature.startsWith('P3') && !signature.startsWith('P6')) {
+                throw new Error(`不支持的PPM格式: ${signature}。仅支持P3和P6格式。`);
+            }
+            
+            // Skip comments and whitespace
+            offset = skipCommentsAndWhitespace(view, offset);
+            
+            // Read width and height
+            const { value: width, newOffset: widthOffset } = readNumber(view, offset);
+            offset = widthOffset;
+            
+            offset = skipWhitespace(view, offset);
+            
+            const { value: height, newOffset: heightOffset } = readNumber(view, offset);
+            offset = heightOffset;
+            
+            offset = skipWhitespace(view, offset);
+            
+            // Read max color value (depth)
+            const { value: maxColor, newOffset: maxColorOffset } = readNumber(view, offset);
+            offset = maxColorOffset;
+            
+            // Skip remaining whitespace after max color
+            offset = skipWhitespace(view, offset);
+            
+            // Update image info
+            imageFormat.textContent = signature === 'P3' ? 'PPM P3 (ASCII)' : 'PPM P6 (二进制)';
+            imageDimensions.textContent = `${width} × ${height} 像素`;
+            imageDepth.textContent = `${maxColor} 位`;
+            
+            // Set canvas dimensions
+            imageCanvas.width = width;
+            imageCanvas.height = height;
+            
+            const imageData = ctx.createImageData(width, height);
+            const data = imageData.data;
+            
+            if (signature === 'P3') {
+                // Parse P3 (ASCII) format
+                parseP3(view, offset, width, height, maxColor, data);
+            } else {
+                // Parse P6 (binary) format
+                parseP6(view, offset, width, height, maxColor, data);
+            }
+            
+            // Draw image data to canvas
+            ctx.putImageData(imageData, 0, 0);
+            
+            // Show image section
+            showImageSection();
+        }
+
+        // Read PPM signature (P3 or P6)
+        function readSignature(view, offset) {
+            let signature = '';
+            while (true) {
+                const byte = view.getUint8(offset);
+                const char = String.fromCharCode(byte);
+                if (char === ' ' || char === '\n' || char === '\r' || char === '\t') {
+                    break;
+                }
+                signature += char;
+                offset++;
+            }
+            return signature;
+        }
+
+        // Skip comments and whitespace
+        function skipCommentsAndWhitespace(view, offset) {
+            while (offset < view.byteLength) {
+                const byte = view.getUint8(offset);
+                const char = String.fromCharCode(byte);
+                
+                // Skip whitespace
+                if (char === ' ' || char === '\n' || char === '\r' || char === '\t') {
+                    offset++;
+                    continue;
+                }
+                
+                // Skip comments (lines starting with #)
+                if (char === '#') {
+                    // Skip until end of line
+                    while (offset < view.byteLength) {
+                        const c = String.fromCharCode(view.getUint8(offset));
+                        offset++;
+                        if (c === '\n' || c === '\r') {
+                            break;
+                        }
+                    }
+                    continue;
+                }
+                
+                // Not whitespace or comment, stop
+                break;
+            }
+            return offset;
+        }
+
+        // Skip whitespace only
+        function skipWhitespace(view, offset) {
+            while (offset < view.byteLength) {
+                const char = String.fromCharCode(view.getUint8(offset));
+                if (char === ' ' || char === '\n' || char === '\r' || char === '\t') {
+                    offset++;
+                } else {
+                    break;
+                }
+            }
+            return offset;
+        }
+
+        // Read a number from the buffer
+        function readNumber(view, offset) {
+            let number = '';
+            while (offset < view.byteLength) {
+                const char = String.fromCharCode(view.getUint8(offset));
+                if (!isNaN(parseInt(char, 10))) {
+                    number += char;
+                    offset++;
+                } else {
+                    break;
+                }
+            }
+            return {
+                value: parseInt(number, 10),
+                newOffset: offset
+            };
+        }
+
+        // Parse P3 (ASCII) format
+        function parseP3(view, offset, width, height, maxColor, data) {
+            let index = 0;
+            const totalPixels = width * height;
+            
+            for (let i = 0; i < totalPixels; i++) {
+                // Skip whitespace
+                offset = skipWhitespace(view, offset);
+                
+                // Read red component
+                const { value: r, newOffset: rOffset } = readNumber(view, offset);
+                offset = rOffset;
+                
+                // Skip whitespace
+                offset = skipWhitespace(view, offset);
+                
+                // Read green component
+                const { value: g, newOffset: gOffset } = readNumber(view, offset);
+                offset = gOffset;
+                
+                // Skip whitespace
+                offset = skipWhitespace(view, offset);
+                
+                // Read blue component
+                const { value: b, newOffset: bOffset } = readNumber(view, offset);
+                offset = bOffset;
+                
+                // Normalize color values to 0-255
+                const scale = 255 / maxColor;
+                data[index] = Math.round(r * scale);     // R
+                data[index + 1] = Math.round(g * scale); // G
+                data[index + 2] = Math.round(b * scale); // B
+                data[index + 3] = 255;                   // A (alpha)
+                
+                index += 4;
+            }
+        }
+
+        // Parse P6 (binary) format
+        function parseP6(view, offset, width, height, maxColor, data) {
+            let index = 0;
+            const totalPixels = width * height;
+            const bytesPerComponent = maxColor > 255 ? 2 : 1; // 16-bit or 8-bit
+            
+            for (let i = 0; i < totalPixels; i++) {
+                // Read red component
+                let r, g, b;
+                
+                if (bytesPerComponent === 2) {
+                    // 16-bit color components (big-endian)
+                    r = view.getUint16(offset);
+                    offset += 2;
+                    g = view.getUint16(offset);
+                    offset += 2;
+                    b = view.getUint16(offset);
+                    offset += 2;
+                } else {
+                    // 8-bit color components
+                    r = view.getUint8(offset++);
+                    g = view.getUint8(offset++);
+                    b = view.getUint8(offset++);
+                }
+                
+                // Normalize color values to 0-255
+                const scale = 255 / maxColor;
+                data[index] = Math.round(r * scale);     // R
+                data[index + 1] = Math.round(g * scale); // G
+                data[index + 2] = Math.round(b * scale); // B
+                data[index + 3] = 255;                   // A (alpha)
+                
+                index += 4;
+            }
+        }
+
+        // UI Helper Functions
+        function showLoading() {
+            loadingIndicator.classList.remove('hidden');
+            errorMessage.classList.add('hidden');
+            imageSection.classList.add('hidden');
+        }
+
+        function showError(message) {
+            loadingIndicator.classList.add('hidden');
+            errorDetails.textContent = message;
+            errorMessage.classList.remove('hidden');
+            imageSection.classList.add('hidden');
+        }
+
+        function showImageSection() {
+            loadingIndicator.classList.add('hidden');
+            errorMessage.classList.add('hidden');
+            imageSection.classList.remove('hidden');
+        }
+
+        // Add click handler to file drop area to trigger file input
+        // fileDropArea.addEventListener('click', () => {
+        //     fileInput.click();
+        // });
+    </script>
+</body>
+</html>
